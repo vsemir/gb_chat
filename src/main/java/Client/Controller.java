@@ -1,14 +1,13 @@
 package Client;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.FileDescriptor;
 import java.io.IOException;
 import java.net.Socket;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.ResourceBundle;
+import java.util.*;
 
+import javafx.application.Platform;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -21,6 +20,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.HBox;
+import jdk.internal.access.JavaIOFileDescriptorAccess;
 
 public class Controller implements Initializable {
 
@@ -55,21 +55,22 @@ public class Controller implements Initializable {
             this.in = new DataInputStream(socket.getInputStream());
             this.out = new DataOutputStream(socket.getOutputStream());
             setAuth(false);
-
+            closeClient(true);
             new Thread(() -> {
                 try {
-                    while (true) { // Ждем сообщения об успешной авторизации ("/authok")
+                    while (true) {
                         final String msgAuth = in.readUTF();
                         System.out.println("CLIENT: Received message: " + msgAuth);
                         if (msgAuth.startsWith("/authok")) {
                             setAuth(true);
+                            closeClient(false);
                             nick = msgAuth.split("\\s")[1];
                             textArea.appendText("Успешная авторизация под ником " + nick + "\n");
                             break;
                         }
                         textArea.appendText(msgAuth + "\n");
                     }
-                    while (true) { // После успешной авторизации можно обрабатывать все сообщения
+                    while (true) {
                         String msgFromServer = in.readUTF();
                         System.out.println("CLIENT: Received message: " + msgFromServer);
                         if (msgFromServer.startsWith(nick)) {
@@ -159,5 +160,38 @@ public class Controller implements Initializable {
             textField.requestFocus();
             textField.selectEnd();
         }
+    }
+
+    public void closeClient(boolean setAuth){
+        Timer timer = new Timer();
+//        TimerTask timerTask = new TimerTask() {
+//            @Override
+//            public void run() {
+//
+//            }
+//        };
+        timer.schedule(new TimerTask() {
+
+            private JavaIOFileDescriptorAccess socket;
+
+            @Override
+            public void run() {
+                if (setAuth){
+                    try {
+                        System.out.println(System.currentTimeMillis());
+                        Platform.exit();
+                        this.socket.close(FileDescriptor.err);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        throw new RuntimeException(e);
+                    }
+                }
+            }
+
+        }, 2*60*1000);
+
+
+
+
     }
 }
