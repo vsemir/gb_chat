@@ -1,4 +1,14 @@
 package Client;
+
+import javafx.application.Platform;
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.fxml.Initializable;
+import javafx.scene.control.*;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.AnchorPane;
+import jdk.internal.access.JavaIOFileDescriptorAccess;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.FileDescriptor;
@@ -6,21 +16,6 @@ import java.io.IOException;
 import java.net.Socket;
 import java.net.URL;
 import java.util.*;
-
-import javafx.application.Platform;
-import javafx.collections.ObservableList;
-import javafx.event.ActionEvent;
-import javafx.fxml.FXML;
-import javafx.fxml.Initializable;
-import javafx.scene.control.Button;
-import javafx.scene.control.ListView;
-import javafx.scene.control.PasswordField;
-import javafx.scene.control.TextArea;
-import javafx.scene.control.TextField;
-import javafx.scene.input.MouseEvent;
-import javafx.scene.layout.AnchorPane;
-import javafx.scene.layout.HBox;
-import jdk.internal.access.JavaIOFileDescriptorAccess;
 
 public class Controller implements Initializable {
 
@@ -48,6 +43,7 @@ public class Controller implements Initializable {
     private TextField loginField;
     @FXML
     private AnchorPane authPanel;
+    private boolean isAuthSuccess;
 
     private void connect() {
         try {
@@ -55,7 +51,7 @@ public class Controller implements Initializable {
             this.in = new DataInputStream(socket.getInputStream());
             this.out = new DataOutputStream(socket.getOutputStream());
             setAuth(false);
-            closeClient(true);
+            new Thread(this::closeClient).start();
             new Thread(() -> {
                 try {
                     while (true) {
@@ -63,7 +59,7 @@ public class Controller implements Initializable {
                         System.out.println("CLIENT: Received message: " + msgAuth);
                         if (msgAuth.startsWith("/authok")) {
                             setAuth(true);
-                            closeClient(false);
+
                             nick = msgAuth.split("\\s")[1];
                             textArea.appendText("Успешная авторизация под ником " + nick + "\n");
                             break;
@@ -94,6 +90,7 @@ public class Controller implements Initializable {
                 } finally {
                     try {
                         setAuth(false);
+
                         socket.close();
                         nick = "";
                     } catch (IOException e) {
@@ -110,6 +107,7 @@ public class Controller implements Initializable {
     }
 
     private void setAuth(boolean isAuthSuccess) {
+        this.isAuthSuccess = isAuthSuccess;
         authPanel.setVisible(!isAuthSuccess);
         authPanel.setManaged(!isAuthSuccess);
 
@@ -162,36 +160,19 @@ public class Controller implements Initializable {
         }
     }
 
-    public void closeClient(boolean setAuth){
-        Timer timer = new Timer();
-//        TimerTask timerTask = new TimerTask() {
-//            @Override
-//            public void run() {
-//
-//            }
-//        };
-        timer.schedule(new TimerTask() {
-
-            private JavaIOFileDescriptorAccess socket;
-
-            @Override
-            public void run() {
-                if (setAuth){
-                    try {
-                        System.out.println(System.currentTimeMillis());
-                        Platform.exit();
-                        this.socket.close(FileDescriptor.err);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                        throw new RuntimeException(e);
-                    }
-                }
+    public void closeClient() {
+        try {
+            Thread.sleep(120000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        if (!isAuthSuccess) {
+            try {
+                socket.close();
+                Platform.exit();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-
-        }, 2*60*1000);
-
-
-
-
+        }
     }
 }
